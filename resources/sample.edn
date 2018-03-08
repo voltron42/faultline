@@ -1,0 +1,49 @@
+[(import [:path :env "test.properties"])
+ {:tags [formulary-permissions-service]
+  :pre [(db-config :permissions-db-config)]
+  :suites
+ {create-permissions
+  {:pre [(db-load {permissions (file/csv [:path :suite "testData1.csv"])})]
+   :tests {create-permissions-request-1
+           {:request [POST (json {"permissions" "restricted"
+                                  "pbm" "wxyz"
+                                  "ehr" "56789"})]
+            :response [200 "restricted"]
+            :post [(db-updated (empty))
+                   (db-created {permissions
+                                [[pbm_uid ehr_uid type sub_type list_id]
+                                 ["xyz" "789" "*" "*" "*"]]})]}
+           create-permissions-request-2
+           {:request [POST (file/json [:path :suite "abc_123_restricted_req.json"])]
+            :response [200 (file/json [:path :suite "abc_123_restricted_resp.json"])]
+            :post [(db-updated (empty))
+                   (db-created {permissions (from/file csv [:path :suite "abc_123_restricted.csv"])})]}
+           create-permissions-request-3
+           {:request [POST (json {"permissions"
+                                        {"COP"
+                                         {"DS" "restricted"}}
+                                  "pbm" "ESI3"
+                                  "ehr" "PracticeFusion"})]
+            :response [200 (json {"permissions"
+                                        {"COP"
+                                         {"DS" "restricted"}}
+                                  "pbm" "ESI3"
+                                  "ehr" "PracticeFusion"})]
+            :post [(db-created {permissions
+                                {pbm_uid "ESI3"
+                                 ehr_uid "PracticeFusion"
+                                 type "COP"
+                                 sub_type "DS"
+                                 list_id "*"
+                                 }})
+                   (db-updated (every? {deactivated_date (not-nil?)}
+                                 {pbm_uid "ESI3"
+                                  ehr_uid "PracticeFusion"
+                                  type "COP"
+                                  sub_type "DS"
+                                  list_id "33333"}))]}}}
+  create-permissions-errors
+  {create-errors-test-1
+   }
+  }
+  }]

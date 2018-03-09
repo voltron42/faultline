@@ -1,49 +1,126 @@
-[(import [:path :env "test.properties"])
- {:tags [formulary-permissions-service]
-  :pre [(db-config :permissions-db-config)]
-  :suites
- {create-permissions
-  {:pre [(db-load {permissions (file/csv [:path :suite "testData1.csv"])})]
-   :tests {create-permissions-request-1
-           {:request [POST (json {"permissions" "restricted"
-                                  "pbm" "wxyz"
-                                  "ehr" "56789"})]
-            :response [200 "restricted"]
-            :post [(db-updated (empty))
-                   (db-created {permissions
-                                [[pbm_uid ehr_uid type sub_type list_id]
-                                 ["xyz" "789" "*" "*" "*"]]})]}
-           create-permissions-request-2
-           {:request [POST (file/json [:path :suite "abc_123_restricted_req.json"])]
-            :response [200 (file/json [:path :suite "abc_123_restricted_resp.json"])]
-            :post [(db-updated (empty))
-                   (db-created {permissions (from/file csv [:path :suite "abc_123_restricted.csv"])})]}
-           create-permissions-request-3
-           {:request [POST (json {"permissions"
-                                        {"COP"
-                                         {"DS" "restricted"}}
-                                  "pbm" "ESI3"
-                                  "ehr" "PracticeFusion"})]
-            :response [200 (json {"permissions"
-                                        {"COP"
-                                         {"DS" "restricted"}}
-                                  "pbm" "ESI3"
-                                  "ehr" "PracticeFusion"})]
-            :post [(db-created {permissions
-                                {pbm_uid "ESI3"
-                                 ehr_uid "PracticeFusion"
-                                 type "COP"
-                                 sub_type "DS"
-                                 list_id "*"
-                                 }})
-                   (db-updated (every? {deactivated_date (not-nil?)}
-                                 {pbm_uid "ESI3"
-                                  ehr_uid "PracticeFusion"
-                                  type "COP"
-                                  sub_type "DS"
-                                  list_id "33333"}))]}}}
-  create-permissions-errors
-  {create-errors-test-1
-   }
-  }
-  }]
+(properties [:path :env "test.properties"])
+
+(tags formulary-permissions-service)
+
+(db/config :permissions-db-config)
+
+(db/schema {:table permissions
+            :key [pbm_uid ehr_uid type sub_type list_id]})
+
+(suite create-permissions
+  "This is an executable specification file which follows markdown syntax."
+  "Every heading in this file denotes a scenario. Every bulleted point denotes a step."
+
+  (db-load permissions (file/csv :path :suite "testData1.csv"))
+
+  (test create-permissions-request-1
+    "Not including a pbm or an ehr with the permissions request will return an error"
+    (request POST :permissions-url (json {"permissions" "restricted"
+                                          "pbm" "wxyz"
+                                          "ehr" "56789"}))
+    (response 200 "restricted")
+
+    (db/updated permissions (empty))
+    (db/created permissions
+      [[pbm_uid ehr_uid type sub_type list_id]
+       ["xyz" "789" "*" "*" "*"]]))
+
+  (test create-permissions-request-2
+
+    "Not including a pbm or an ehr with the permissions request will return an error"
+
+    (request POST :permissions-url (file/json :path :suite "abc_123_restricted_req.json"))
+    (response 200 (file/json :path :suite "abc_123_restricted_resp.json"))
+    (db/updated permissions (empty))
+    (db/created permissions (file/csv :path :suite "abc_123_restricted.csv")))
+
+  (test create-permissions-request-3
+    "Not including a pbm or an ehr with the permissions request will return an error"
+    (request POST :permissions-url (json {"permissions"
+                                          {"COP"
+                                           {"DS" "restricted"}}
+                                          "pbm" "ESI3"
+                                          "ehr" "PracticeFusion"}))
+    (response 200 (json {"permissions"
+                         {"COP"
+                          {"DS" "restricted"}}
+                         "pbm" "ESI3"
+                         "ehr" "PracticeFusion"}))
+    (db/created permissions {pbm_uid "ESI3"
+                             ehr_uid "PracticeFusion"
+                             type "COP"
+                             sub_type "DS"
+                             list_id "*"})
+    (db/updated permissions (every?
+                  {deactivated_date (is-not-null)}
+                  {pbm_uid "ESI3"
+                   ehr_uid "PracticeFusion"
+                   type "COP"
+                   sub_type "DS"
+                   list_id "33333"})))
+
+  (db/clean permissions (file/csv :path :suite "testData1.csv")))
+
+(suite create-permissions-errors
+
+  "This is an executable specification file which follows markdown syntax."
+  "Every heading in this file denotes a scenario. Every bulleted point denotes a step."
+  "These tests are realted to Create Error Scenarios taken from ERX46557."
+
+  (test create-errors-test-1
+    "This test case is creating a permissions restriction ERX46557 TC1"
+    (request POST :permissions-url (file/json :path :suite "error_restrictions_added_req.json"))
+    (response 200 (file/json :path :suite "error_restrictions_added_resp.json"))
+    (db/created permissions (file/csv :path :suite "RestrictionsAdded.csv")))
+
+  (test create-errors-test-2
+    "This test case is creating additional permissions restrictions from the above test ERX46557 TC1."
+    (request POST :permissions-url (file/json :path :suite "error_additional_restrictions_added_req.json"))
+    (response 400 (file/json :path :suite "error_additional_restrictions_added_resp.json"))
+    (db/created permissions (empty)))
+
+  (test create-errors-test-3
+    "This test case is creating an invalid POST ERX46557 TC4"
+    (request POST :permissions-url (file/json :path :suite "error_invalid_list_post_req.json"))
+    (response 400 (file/json :path :suite "error_invalid_list_post_resp.json"))
+    (db/created permissions (empty)))
+
+  (test create-errors-test-4
+    "This test case is creating an invalid restricted POST ERX46557"
+    (request POST :permissions-url (file/json :path :suite "error_invalid_restricted_post_req.json"))
+    (response 400 (file/json :path :suite "error_invalid_restricted_post_resp.json"))
+    (db/created permissions (empty))))
+
+(suite create-alt-permissions
+  "These test are related to Alt create scenarios."
+  (db/load permissions (file/csv :path :suite "testData1ALT.csv"))
+
+  (test create-permissions-alt-request-1
+    "Test case to add Alt ID's added to permissions table"
+    (request POST :permissions-url (file/json :path :suite "FPS_Alt_Standard_req.json"))
+    (response 200 (file/json :path :suite "FPS_Alt_Standard_resp.json"))
+    (db/created permissions (file/csv :path :suite "FPS_Alt_Standard.csv")))
+
+  (test create-permissions-alt-request-2
+    "All Alt is restricted."
+    (request POST :permissions-url (file/json :path :suite "FPS_Alt_All_Restricted_req.json"))
+    (response 200 (file/json :path :suite "FPS_Alt_All_Restricted_resp.json"))
+    (db/created permissions (file/csv :path :suite "FPS_Alt_All_Restricted.csv")))
+
+  (db/clean permissions (file/csv :path :suite "testData1ALT.csv")))
+
+(suite create-cop-permissions
+  "These test are related to COP create scenarios."
+
+  (test create-permissions-cop-request-1
+    "Test case to add COP ID's added to permissions table"
+    (request POST :permissions-url (file/json :path :suite "FPS_COP_Standard_req.json"))
+    (response 200 (file/json :path :suite "FPS_COP_Standard_resp.json"))
+    (db/created permissions (file/csv :path :suite "FPS_COP_Standard.csv")))
+
+  (test create-permissions-cop-request-2
+    "All COP is restricted."
+    (request POST :permissions-url (file/json :path :suite "FPS_COP_All_Restricted_req.json"))
+    (response 200 (file/json :path :suite "FPS_COP_All_Restricted_resp.json"))
+    (db/created permissions (file/csv :path :suite "FPS_COP_All_Restricted.csv"))))
+

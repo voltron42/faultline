@@ -2,86 +2,103 @@
   (:require [clojure.spec.alpha :as s]
             [faultline.validation :as v]))
 
-(s/def :fault/regression (s/or :suite-only :fault/suites
-                               :globals (s/and vector?
-                                               (s/cat :imports-and-configs (s/+ (s/or :import :fault/import
-                                                                                      :config :fault/config
-                                                                                      :db-config :db-config))
-                                                      :suite (s/or :single :fault/suite
-                                                                   :multi :fault/suites)))))
+(def valid-name #"[a-zA-Z][a-zA-Z0-9_-$?]*")
 
-(s/def :fault/import (s/and list?
-                            (s/cat :label #{'import}
-                                   :file :fault/templated-string)))
+(s/def :fault/variable (s/and keyword? (v/named-as valid-name)))
 
-(s/def :fault/config (s/and list?
+(s/def :fault/testfile (s/cat :imports (s/? :fault/import)
+                              :setup (s/* :fault/setup)
+                              :suites (s/+ :suite)
+                              :teardown (s/* :fault/teardown)))
+
+(s/def :suite/name (s/and symbol (v/named-as valid-name)))
+
+(s/def :fault/suite (s/and list?
+                           (s/cat :label #{'suite}
+                                  :test-name :suite/name
+                                  :setup (s/* :fault/setup)
+                                  :test-or-suite (s/or (s/+ :fault/suite)
+                                                       (s/+ :fault/test))
+                                  :teardown (s/* :fault/teardown))))
+
+(s/def :test/name (s/and symbol (v/named-as valid-name)))
+
+(s/def :fault/test (s/and list?
+                          (s/cat :label #{'test}
+                                 :test-name :test/name
+                                 :setup (s/* :fault/setup)
+                                 :preconditions (s/* :fault/precondition)
+                                 :request :test/request
+                                 :response :test/response
+                                 :postconditions (s/* :fault/postcondition)
+                                 :teardown (s/* :fault/teardown))))
+
+(s/def :fault/import (s/cat :properties (s/* (s/or :assign-or-comment :fault/assign-or-comment
+                                                   :props :fault/properties))
+                            :db-config (s/? :db/config)
+                            :db-schema (s/* (s/or :assign-or-comment :fault/assign-or-comment
+                                                  :schema :fault/db-schema))))
+
+(s/def :fault/setup (s/or :db-load :db/load
+                          :assign-or-comment :fault/assign-or-comment))
+
+(s/def :fault/teardown (s/or :db-clean :db/clean
+                             :comment :fault/comment))
+
+(s/def :fault/precondition (s/or :comment :fault/comment))
+
+(s/def :fault/postcondition (s/or :db-created :db/created
+                                  :db-updated :db/updated
+                                  :db-deleted :db/deleted
+                                  :comment :fault/comment))
+
+(s/def :fault/assign-or-comment (s/or :assign :fault/assign
+                                      :comment :fault/comment))
+
+(s/def :fault/comment string?)
+
+(s/def :fault/assign (s/and list?
                             (s/cat :label #{'assign}
                                    :variable :fault/variable
                                    :value :config/value)))
 
 (s/def :config/value
-  (s/or :complex (s/and list?
-                        (s/or :file (s/cat :label #{'file}
-                                           :type '#{xml json text yaml csv}
-                                           :file-name :fault/templated-string)
-                              :json (s/cat :label #{'json}
-                                           :body :body/json)
-                              :xml (s/cat :label #{'xml}
-                                          :body :body/xml)
-                              :plain-text (s/cat :label #{'text}
-                                                 :body :fault/templated-string)))
+  (s/or :complex :data/structured
         :variable :fault/variable
         :text string?
         :number number?
         :boolean boolean?))
 
-(def valid-name #"[a-zA-Z][a-zA-Z0-9_-$?]*")
+(s/def :data/structured (s/and list?
+                               (s/or :file (s/cat :label (v/named-as #{'file} '#{xml json text yaml csv})
+                                                  :file-name :fault/templated-string)
+                                     :json (s/cat :label #{'json}
+                                                  :body :body/json)
+                                     :xml (s/cat :label #{'xml}
+                                                 :body :body/xml)
+                                     :plain-text (s/cat :label #{'text}
+                                                        :body :fault/templated-string))))
 
-(s/def :fault/variable (s/and keyword? (v/named-as valid-name)))
-
-(s/def :fault/suites (s/map-of :suite/name :fault/suite))
-
-(s/def :fault/tests (s/map-of :test/name :fault/test))
-
-(s/def :fault/suite (s/merge (s/keys :opt-un [:test/pre :test/post])
-                             (s/or
-                               (s/keys :req-un [:fault/suites])
-                               (s/keys :req-un [:fault/tests]))))
-
-(s/def :suite/name (s/and symbol (v/named-as valid-name)))
-
-(s/def :test/name (s/and symbol (v/named-as valid-name)))
-
-(s/def :fault/test (s/merge (s/keys :opt-un [:test/pre :test/post])
-                            (s/or :endpoint (s/keys :req-un [:test/request :test/response])
-                                  :cli (s/keys :req-un [:test/command-line]
-                                               :opt-un [:test/console-out :test/result]))))
+(s/def :fault/properties (s/and list?
+                                (s/cat :label #{'properties}
+                                       :file :fault/templated-string)))
 
 (s/def :fault/templated-string (s/or :simple string?
                                      :variable (s/and vector?
                                                       (s/coll-of (s/or :string string?
                                                                        :variable :fault/variable)))))
 
-(s/def :test/command-line :fault/templated-string)
-
-(s/def :test/console-out (s/and list?
-                                (s/or :file (s/cat :label #{'file}
-                                                   :file-name :fault/templated-string)
-                                      :plain-text (s/cat :label #{'text}
-                                                         :body :fault/templated-string))))
-
-(s/def :test/result int?)
-
-(s/def :test/request (s/or :shorthand (s/and list?
-                                             (s/cat :method :request/method
-                                                    :url :request/url
-                                                    :headers (s/? :endpoint/headers)
-                                                    :body (s/? :endpoint/body)))
-                           :map (s/keys :req-un [:request/url]
-                                        :opt-un [:request/method :endpoint/headers :endpoint/body])))
+(s/def :test/request
+  (s/and list?
+         (s/cat :label #{'request}
+                :method :request/method
+                :url :request/url
+                :headers (s/? :endpoint/headers)
+                :body (s/? :endpoint/body))))
 
 (s/def :request/url (s/or :simple string?
-                          :variable (s/and vector?
+                          :variable :fault/variable
+                          :complex (s/and vector?
                                            (s/cat :protocal #{"http://" "https://"}
                                                   :steps (s/+ (s/or :string string?
                                                                     :variable :fault/variable))))))
@@ -125,12 +142,14 @@
                                                             :variable :fault/variable)))))
 (s/def :response/status (v/one-of (concat (range 100 104) (range 200 209) [226] (range 300 309) (range 400 419) (range 421 427) [428 429 431 451] (range 500 509) [510 511])))
 
-(s/def :test/response (s/or :status-only :response/status
-                            :map (s/keys :opt-un [:response/status :endpoint/headers :endpoint/body])
-                            :shorthand (s/and vector?
-                                              (s/cat :status :response/status
-                                                     :headers (s/? :endpoint/headers)
-                                                     :body (s/? :endpoint/body)))))
+(s/def :test/response
+  (s/and list?
+         (s/cat :label #{'response}
+                :status :response/status
+                :headers (s/? :endpoint/headers)
+                :body (s/? :endpoint/body))))
+
+;===========================================================================================================
 
 (s/def :test/pre (s/and vector?
                         (s/+ (s/or :config :fault/config

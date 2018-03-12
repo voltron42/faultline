@@ -1,17 +1,16 @@
-(properties [:path :env "test.properties"])
+(properties (file/properties :path :env "test.properties"))
 
 (tags formulary-permissions-service)
 
 (db/config :permissions-db-config)
 
-(db/schema {:table permissions
-            :key [pbm_uid ehr_uid type sub_type list_id]})
+(db/tables permissions)
 
 (suite create-permissions
   "This is an executable specification file which follows markdown syntax."
   "Every heading in this file denotes a scenario. Every bulleted point denotes a step."
 
-  (db-load permissions (file/csv :path :suite "testData1.csv"))
+  (db/load permissions (file/csv :path :suite "testData1.csv"))
 
   (test create-permissions-request-1
     "Not including a pbm or an ehr with the permissions request will return an error"
@@ -20,10 +19,10 @@
                                           "ehr" "56789"}))
     (response 200 "restricted")
 
-    (db/updated permissions (empty))
-    (db/created permissions
-      [[pbm_uid ehr_uid type sub_type list_id]
-       ["xyz" "789" "*" "*" "*"]]))
+    (db/updated permissions (EMPTY))
+    (db/created permissions (validate
+                              [pbm_uid ehr_uid type sub_type list_id deactivated_date]
+                              ["xyz" "789" "*" "*" "*" null])))
 
   (test create-permissions-request-2
 
@@ -31,33 +30,29 @@
 
     (request POST :permissions-url (file/json :path :suite "abc_123_restricted_req.json"))
     (response 200 (file/json :path :suite "abc_123_restricted_resp.json"))
-    (db/updated permissions (empty))
+    (db/updated permissions (EMPTY))
     (db/created permissions (file/csv :path :suite "abc_123_restricted.csv")))
 
   (test create-permissions-request-3
     "Not including a pbm or an ehr with the permissions request will return an error"
-    (request POST :permissions-url (json {"permissions"
-                                          {"COP"
-                                           {"DS" "restricted"}}
+    (request POST :permissions-url (json {"permissions" {"COP" {"DS" "restricted"}}
                                           "pbm" "ESI3"
                                           "ehr" "PracticeFusion"}))
-    (response 200 (json {"permissions"
-                         {"COP"
-                          {"DS" "restricted"}}
+    (response 200 (json {"permissions" {"COP" {"DS" "restricted"}}
                          "pbm" "ESI3"
                          "ehr" "PracticeFusion"}))
-    (db/created permissions {pbm_uid "ESI3"
-                             ehr_uid "PracticeFusion"
-                             type "COP"
-                             sub_type "DS"
-                             list_id "*"})
-    (db/updated permissions (every?
-                  {deactivated_date (is-not-null)}
-                  {pbm_uid "ESI3"
-                   ehr_uid "PracticeFusion"
-                   type "COP"
-                   sub_type "DS"
-                   list_id "33333"})))
+    (db/created permissions
+      (table
+        [pbm_uid ehr_uid type sub_type list_id]
+        ["ESI3" "PracticeFusion" "COP" "DS" "*"]))
+
+    (db/updated permissions
+      (table
+        [pbm_uid ehr_uid type sub_type list_id deactivated_date]
+        ["ESI3" "PracticeFusion" "COP" "DS" "33333" null])
+      (validate
+        [pbm_uid ehr_uid type sub_type list_id deactivated_date]
+        ["ESI3" "PracticeFusion" "COP" "DS" "33333" (is-not-null)])))
 
   (db/clean permissions (file/csv :path :suite "testData1.csv")))
 
@@ -77,19 +72,19 @@
     "This test case is creating additional permissions restrictions from the above test ERX46557 TC1."
     (request POST :permissions-url (file/json :path :suite "error_additional_restrictions_added_req.json"))
     (response 400 (file/json :path :suite "error_additional_restrictions_added_resp.json"))
-    (db/created permissions (empty)))
+    (db/created permissions (EMPTY)))
 
   (test create-errors-test-3
     "This test case is creating an invalid POST ERX46557 TC4"
     (request POST :permissions-url (file/json :path :suite "error_invalid_list_post_req.json"))
     (response 400 (file/json :path :suite "error_invalid_list_post_resp.json"))
-    (db/created permissions (empty)))
+    (db/created permissions (EMPTY)))
 
   (test create-errors-test-4
     "This test case is creating an invalid restricted POST ERX46557"
     (request POST :permissions-url (file/json :path :suite "error_invalid_restricted_post_req.json"))
     (response 400 (file/json :path :suite "error_invalid_restricted_post_resp.json"))
-    (db/created permissions (empty))))
+    (db/created permissions (EMPTY))))
 
 (suite create-alt-permissions
   "These test are related to Alt create scenarios."

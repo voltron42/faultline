@@ -1,4 +1,4 @@
-(ns faultline.validation)
+(ns faultline.commmon.validation)
 
 (defn min-count [bound]
   (fn [value]
@@ -30,3 +30,19 @@
 (defn one-of [my-list]
   (fn [value]
     (contains? (set my-list) value)))
+
+(defn match-row-lengths []
+  (fn [value]
+    (if-not (coll? value)
+      (do
+        (println "not collection")
+        (println (type value))
+        (println value)
+        false)
+      (let [[_ & rows] value]
+        (println "collection")
+        (println (type rows))
+        (println rows)
+        (and
+          (every? coll? rows)
+          (= 1 (count (set (map count rows)))))))))

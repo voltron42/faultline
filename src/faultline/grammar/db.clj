@@ -3,7 +3,6 @@
             [faultline.grammar.common :as c]
             [faultline.grammar.file :refer :all]
             [faultline.grammar.data :refer :all]
-            [faultline.grammar.rules :refer :all]
             [faultline.commmon.validation :as v]))
 
 (s/def :db/table-name (s/and symbol? (v/named-as c/valid-name)))

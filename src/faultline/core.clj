@@ -9,7 +9,6 @@
             [clojure.data.csv :as csv])
   (:import (java.io File ByteArrayInputStream)
            (clojure.lang ExceptionInfo)
-           (java.util.Map Entry)
            (java.util Properties)))
 
 (defn build-next [db tables variables results]
@@ -24,77 +23,84 @@
 (defn get-file-contents [variables path]
   (slurp (build-file-string variables path)))
 
-(def functions
-  {'file/properties (fn [{:keys [variables args]}]
-                      (let [properties (Properties.)]
-                        (.load properties
-                               (ByteArrayInputStream.
-                                 (.getBytes
-                                   (get-file-contents variables args))))))
-   'file/xml (fn [{:keys [variables args]}]
-               (zip/xml-zip
-                 (xml/parse
-                   (ByteArrayInputStream.
-                     (.getBytes
-                       (get-file-contents variables args))))))
-   'file/json (fn [{:keys [variables args]}]
-                (json/read-str (get-file-contents variables args)))
-   'file/text (fn [{:keys [variables args]}]
-                (get-file-contents variables args))
-   'file/csv (fn [{:keys [variables args]}]
-               (csv/read-csv
-                 (get-file-contents variables args)))
-   'text (fn [{:keys [variables args]}]
-           (build-string variables "" args))
-   'params (fn [{:keys [variables] [params] :args}]
-             ;todo
-             )
-   'xml (fn [{:keys [variables] [xml-body] :args}]
-          ;todo
-          )
-   'json (fn [{:keys [variables] [json-body] :args}]
-           ;todo
-           )
-   'table (fn [{:keys [variables] rows :args}]
-           ;todo
-           )
-   })
+(defmulti resolve-function (fn [func & _] func))
 
-(def commands {'properties (fn [{:keys [db tables variables results args] :as context}]
-                             ;todo
-                             )
-               'assign (fn [{:keys [variables] [variable value] :args :as context}]
-                         (let [outval (cond
-                                        (list? value) (let [[func & args] value]
-                                                        ((functions func) (assoc context :args args)))
-                                        (keyword? value) (get variables value)
-                                        :else value)]
-                           (assoc context :variables (assoc variables variable outval))))
-               'tags (fn [context]
-                       (dissoc context :args))
-               'db-config (fn [{:keys [args] :as context}]
-                            ;todo
-                            )
-               'db-tables (fn [{:keys [args] :as context}]
-                            (assoc context :tables args))
-               })
+(defmethod resolve-function :default [func context args]
+  (println func))
+
+(defmethod resolve-function 'file/properties
+  [_ {:keys [variables]} args]
+  (let [properties (Properties.)]
+    (.load properties
+           (ByteArrayInputStream.
+             (.getBytes
+               (get-file-contents variables args))))))
+
+(defmethod resolve-function 'file/xml
+  [_ {:keys [variables]} args]
+  (zip/xml-zip
+    (xml/parse
+      (ByteArrayInputStream.
+        (.getBytes
+          (get-file-contents variables args))))))
+
+(defmethod resolve-function 'file/json
+  [_ {:keys [variables]} args]
+  (json/read-str (get-file-contents variables args)))
+
+(defmethod resolve-function 'file/text
+  [_ {:keys [variables]} args]
+  (get-file-contents variables args))
+
+(defmethod resolve-function 'file/csv
+  [_ {:keys [variables]} args]
+  (csv/read-csv (get-file-contents variables args)))
+
+(defmethod resolve-function 'text
+  [_ {:keys [variables]} args]
+  (build-string variables "" args))
+
+(defmulti process-command (fn [_ [command & _]] command))
+
+(defmethod process-command :default [out step] out)
+
+(defmethod process-command 'properties [{:keys [db tables variables results] :as ctx} [_ & args]]
+  ;todo
+  )
+
+(defmethod process-command 'assign [{:keys [db tables variables results] :as context} [_ & [variable value]]]
+  (let [outval (cond
+                 (list? value) (let [[func & args] value]
+                                 (resolve-function func context args))
+                 (keyword? value) (get variables value)
+                 :else value)]
+    (assoc context :variables (assoc variables variable outval))))
+
+(defmethod process-command 'db-config [context [_ & args]]
+  ;todo
+  )
+
+(defmethod process-command 'db-tables [context [_ & args]]
+  (assoc context :tables args))
 
 (defn process-test [test-data]
-  (let [system-properties (System/getProperties)]
-    (reduce
-      (fn [{:keys [db tables variables results]} [command & args]]
-        ((get commands command) db tables variables results args))
-      {:db (atom nil)
-       :tables (atom [])
-       :variables (reduce
-                    #(assoc %1 (keyword "prop" %2) (.getProperty system-properties %2))
-                    (reduce
-                      #(assoc %1 (keyword "env" (.getKey %2)) (.getValue %2))
-                      {}
-                      (.entrySet (System/getenv)))
-                    (.propertyNames system-properties))
-       :results []}
-      test-data)))
+  (let [system-properties (System/getProperties)
+        {:keys [db tables variables results]}
+        (reduce
+          process-command
+          {:db (atom nil)
+           :tables (atom [])
+           :variables
+           (reduce
+             #(assoc %1 (keyword "prop" %2) (.getProperty system-properties %2))
+             (reduce-kv
+               #(assoc %1 (keyword "env" %2) %3)
+               {}
+               (System/getenv))
+             (.propertyNames system-properties))
+           :results []}
+          test-data)]
+    ))
 
 (defn run-regression [test-file]
   (println "Running test: " test-file)

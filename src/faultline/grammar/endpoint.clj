@@ -27,7 +27,7 @@
          (s/cat :label #{'request}
                 :method :request/method
                 :url :request/url
-                :headers (s/? :endpoint/headers)
+                :headers :endpoint/headers
                 :body (s/? :endpoint/body))))
 
 (s/def :response/status (v/one-of (concat (range 100 104) (range 200 209) [226] (range 300 309) (range 400 419) (range 421 427) [428 429 431 451] (range 500 509) [510 511])))
@@ -36,5 +36,5 @@
   (s/and list?
          (s/cat :label #{'response}
                 :status :response/status
-                :headers (s/? :endpoint/headers)
+                :headers :endpoint/headers
                 :body (s/? :endpoint/body))))

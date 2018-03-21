@@ -49,9 +49,7 @@
 (defn get-file-contents [ctx variables path]
   (slurp (build-file-string ctx variables path)))
 
-(defn compare [actual expected]
-  ; todo
-  true)
+; todo
 
 (defmethod resolve-function :default [_ [func & _]]
   (println func))
@@ -145,11 +143,30 @@
         resp (client/request req)]
     (assoc ctx :response resp)))
 
+(defmulti compare (fn [compare-type _ _ _] compare-type))
+
+(defmethod compare :status [_ {:keys [variables] :as ctx} actual expected]
+  (let [expected (resolve-value ctx variables expected)])
+  (when-not (= actual expected)
+    {:actual actual :expected expected}))
+
+(defmulti resolve-matcher )
+
+(defmethod compare :headers [_ {:keys [variables] :as ctx} actual expected]
+  (let [matcher (resolve-matcher expected)]
+    ;todo
+    ))
+
+(defmethod compare :body [_ {:keys [variables] :as ctx} actual expected]
+
+  ;todo
+  )
+
 (defmethod process-command 'response
   [{{:keys [status body headers]} :response :as ctx}
    [_ expected-status expected-headers & [expected-body]]]
   (let [errors (reduce-kv
-                 #(if-let [error (apply compare %3)] (assoc %1 %2 error) %1)
+                 #(if-let [error (apply compare %2 ctx %3)] (assoc %1 %2 error) %1)
                  {}
                  {:status [status expected-status]
                   :headers [headers expected-headers]

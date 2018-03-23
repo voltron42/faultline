@@ -1,14 +1,15 @@
 (ns faultline.grammar.data
   (:require [clojure.spec.alpha :as s]
             [faultline.grammar.common :refer :all]
-            [faultline.commmon.validation :as v]))
+            [faultline.commmon.validation :as v]
+            [pred-i-kit.core :as p]))
 
 (def xml-valid-name #"[a-wyzA-WYZ_][a-zA-Z0-9_-]*")
 
 (s/def :xml/name
   (s/and symbol?
-         (s/or :namespace (v/named-as xml-valid-name xml-valid-name)
-               :name-only (v/named-as xml-valid-name))))
+         (s/or :namespace (p/named-as xml-valid-name xml-valid-name)
+               :name-only (p/named-as xml-valid-name))))
 
 (s/def :body/xml
   (s/and vector?

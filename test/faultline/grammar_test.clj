@@ -10,18 +10,21 @@
 (deftest validate-request
   (is (= nil (s/explain-data
                :test/request
-               '(request GET :request-url))))
+               '(request GET :request-url {}))))
+
   (is (= nil (s/explain-data
                :test/request
-               '(request POST :permissions-url (json {"permissions" "restricted"
+               '(request POST :permissions-url {} (json {"permissions" "restricted"
                                                       "pbm" "wxyz"
                                                       "ehr" "56789"})))))
+
   (is (= nil (s/explain-data
                :test/request
-               '(request POST :permissions-url (file/json :path :suite "abc_123_restricted_req.json")))))
+               '(request POST :permissions-url {} (file/json :path :suite "abc_123_restricted_req.json")))))
+
   (is (= nil (s/explain-data
                :test/request
-               '(request POST :permissions-url (json {"permissions" {"COP" {"DS" "restricted"}}
+               '(request POST :permissions-url {} (json {"permissions" {"COP" {"DS" "restricted"}}
                                                       "pbm" "ESI3"
                                                       "ehr" "PracticeFusion"})))))
   )
@@ -29,16 +32,16 @@
 (deftest validate-response
   (is (= nil (s/explain-data
                :test/response
-               '(response 200))))
+               '(response 200 {}))))
   (is (= nil (s/explain-data
                :test/response
-               '(response 200 "restricted"))))
+               '(response 200 {} "restricted"))))
   (is (= nil (s/explain-data
                :test/response
-               '(response 200 (file/json :path :suite "abc_123_restricted_resp.json")))))
+               '(response 200 {} (file/json :path :suite "abc_123_restricted_resp.json")))))
   (is (= nil (s/explain-data
                :test/response
-               '(response 200 (json {"permissions" {"COP" {"DS" "restricted"}}
+               '(response 200 {} (json {"permissions" {"COP" {"DS" "restricted"}}
                                      "pbm" "ESI3"
                                      "ehr" "PracticeFusion"})))))
   )
@@ -48,8 +51,8 @@
                :fault/test
                '(test
                   test-1
-                  (request GET :request-url)
-                  (response 200))))))
+                  (request GET :request-url {})
+                  (response 200 {}))))))
 
 (deftest validate-suite
   (is (= nil (s/explain-data
@@ -58,8 +61,8 @@
                   suite-1
                   (test
                     test-1
-                    (request GET :request-url)
-                    (response 200)))))))
+                    (request GET :request-url {})
+                    (response 200 {})))))))
 
 (deftest validate-regression
   (is (= nil (s/explain-data
@@ -68,8 +71,8 @@
                    suite-1
                    (test
                      test-1
-                     (request GET :request-url)
-                     (response 200)))]))))
+                     (request GET :request-url {})
+                     (response 200 {})))]))))
 
 (deftest validate-properties
   (is (= nil (s/explain-data

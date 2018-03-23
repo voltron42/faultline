@@ -5,11 +5,12 @@
             [faultline.grammar.file :refer :all]
             [faultline.grammar.db :refer :all]
             [faultline.grammar.endpoint :refer :all]
-            [faultline.commmon.validation :as v]))
+            [faultline.commmon.validation :as v]
+            [pred-i-kit.core :as p]))
 
-(s/def :suite/name (s/and symbol (v/named-as c/valid-name)))
+(s/def :suite/name (s/and symbol (p/named-as c/valid-name)))
 
-(s/def :test/name (s/and symbol (v/named-as c/valid-name)))
+(s/def :test/name (s/and symbol (p/named-as c/valid-name)))
 
 (s/def :fault/comment string?)
 

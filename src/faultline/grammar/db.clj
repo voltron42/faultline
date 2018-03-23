@@ -3,11 +3,12 @@
             [faultline.grammar.common :as c]
             [faultline.grammar.file :refer :all]
             [faultline.grammar.data :refer :all]
-            [faultline.commmon.validation :as v]))
+            [faultline.commmon.validation :as v]
+            [pred-i-kit.core :as p]))
 
-(s/def :db/table-name (s/and symbol? (v/named-as c/valid-name)))
+(s/def :db/table-name (s/and symbol? (p/named-as c/valid-name)))
 
-(s/def :db/column-name (s/and symbol? (v/named-as c/valid-name)))
+(s/def :db/column-name (s/and symbol? (p/named-as c/valid-name)))
 
 (s/def :db/classname :variable/string)
 
@@ -23,7 +24,7 @@
 
 (s/def :db/table-keys (s/or :single :db/column-name
                             :multi (s/and vector?
-                                          (v/min-count 2)
+                                          (p/min-count 2)
                                           (s/coll-of :db/column-name))))
 
 (s/def :db/config

@@ -1,12 +1,13 @@
 (ns faultline.grammar.common
   (:require [clojure.spec.alpha :as s]
-            [faultline.commmon.validation :as v]))
+            [faultline.commmon.validation :as v]
+            [pred-i-kit.core :as p]))
 
 (def valid-name #"[a-zA-Z][a-zA-Z0-9_-]*")
 
-(s/def :fault/tag-name (s/and symbol? (v/named-as valid-name)))
+(s/def :fault/tag-name (s/and symbol? (p/named-as valid-name)))
 
-(s/def :fault/variable (s/and keyword? (v/named-as valid-name)))
+(s/def :fault/variable (s/and keyword? (p/named-as valid-name)))
 
 (s/def :variable/string (s/or :literal string?
                               :variable :fault/variable))
